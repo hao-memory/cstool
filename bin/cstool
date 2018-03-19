@@ -1,0 +1,83 @@
+#!/usr/bin/env node
+
+const program = require('commander');
+
+program
+  .version(require('../package').version, '-v, --version')
+  .option('--packageName <packageName>', 'package name, default package.json name')
+  .option('--config <path>', 'custom config path, default is webpack.config.js')
+  .option('--env <env>', 'one of ["dev", "uat1", "stg", "prd"],default "dev"')
+  .option('--server', 'run with server,default false')
+  .option('--port <port>', 'server port,default 9000')
+  .option('--hash', 'build with hash,default false')
+  .option('--extract', 'extract common,default false')
+  .option('--cdn', 'static cdn,defalut false')
+  .option('--useRem', 'use rem instead px(base is 75),default false')
+  .option('--local', 'access page like local file,default false')
+  .option('--no-sourceMap', 'quickly find question,default true')
+  .option('--autoOpenBrowser', ' automatically open browser, default false')
+  .parse(process.argv);
+
+program.cwd = process.cwd();
+program.env = program.env || 'dev';
+
+let retVal = {
+  next() {
+
+  }
+};
+
+const endProcess = (result) => {
+  if (result.value) {
+    console.log(`${result.value} generating ...`);
+  }
+  if (result.done) {
+    console.log('build completed.');
+    process.exit(0);
+  }
+};
+
+const normalProcess = () => {
+  require('../lib/build')(program, (err) => {
+    if (err) {
+      console.err('normalProcess', err);
+    }
+    endProcess(retVal.next());
+  });
+  return 'dist';
+};
+
+const localProcess = () => {
+  require('../lib/build-local')(program, (err) => {
+    if (err) {
+      console.err('localProcess', err);
+    }
+    endProcess(retVal.next());
+  });
+  return 'dist-local';
+};
+
+const zipProcess = () => {
+  require('../lib/build-zip')(program, (err) => {
+    if (err) {
+      console.err('zipProcess', err);
+    }
+    endProcess(retVal.next());
+  });
+  return 'zip';
+};
+
+function* allProcess() {
+  yield normalProcess();
+  if (program.local) {
+    yield localProcess();
+    yield zipProcess();
+  }
+}
+
+if (program.server) {
+  require('../lib/build')(program);
+} else {
+  retVal = allProcess();
+  endProcess(retVal.next());
+}
